@@ -5,64 +5,131 @@ import {
   Typography,
   useTheme,
   Switch,
+  Slider,
+  CircularProgress,
+  LinearProgress,
 } from "@mui/material";
 import { tokens } from "../theme";
-import { mockTransactions } from "../data/mockData";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import EmailIcon from "@mui/icons-material/Email";
-import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import TrafficIcon from "@mui/icons-material/Traffic";
 
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
 import DeviceThermostatIcon from "@mui/icons-material/DeviceThermostat";
 import LineChart from "../components/LineChart";
 import { useState, useEffect } from "react";
-import { fetchLastData } from "../controllers/axios";
-
+import { getCurrentData, updateFan, updateLed } from "../controllers/axios";
 import Header from "../components/Header";
-// import LineChart from "../../components/LineChart";
-// import GeographyChart from "../../components/GeographyChart";
-// import BarChart from "../../components/BarChart";
-// import StatBox from "../../components/StatBox";
-// import ProgressCircle from "../../components/ProgressCircle";
+
+import io from "socket.io-client";
+// import css
+import "./Dashboard.css";
+
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faLightbulb as lightbulbOn,
+  faFan,
+  faTemperatureThreeQuarters,
+  faDroplet,
+} from "@fortawesome/free-solid-svg-icons";
+
+import { faLightbulb as lightbulbOff } from "@fortawesome/free-regular-svg-icons";
 
 const Dashboard = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
 
-  const [data, setData] = useState(null);
-  const feed_key = "temp";
+  const [temp, setTemp] = useState("0");
+  const [humid, setHumid] = useState("0");
+  const [fan, setFan] = useState("0");
+  const [led, setLed] = useState(0);
+  const [ai, setAi] = useState("0");
+
+  const [ledLoading, setLedLoading] = useState(false);
+  const [fanLoading, setFanLoading] = useState(false);
+  const [tempLoading, setTempLoading] = useState(false);
+  const [humidLoading, setHumidLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const [logs, setLogs] = useState([]);
+
+  const pushLog = (log) => {
+    setLogs((prevLogs) => [log, ...prevLogs]);
+  };
 
   useEffect(() => {
     (async () => {
-      const latestData = await fetchLastData(feed_key);
-      setData(latestData);
+      const currentTemp = await getCurrentData("temp");
+      setTemp(currentTemp);
+      const currentHumid = await getCurrentData("humid");
+      setHumid(currentHumid);
+      const currentFan = await getCurrentData("fan");
+      setFan(currentFan);
+      const currentLed = await getCurrentData("led");
+      setLed(parseInt(currentLed));
+      const currentAi = await getCurrentData("ai");
+      setAi(currentAi);
     })();
+  }, []);
+
+  useEffect(() => {
+    console.log("Current data:", { temp, humid, fan, led, ai });
+  }, [temp, humid, fan, led, ai]);
+
+  useEffect(() => {
+    const socket = io("http://localhost:8080");
+
+    socket.on("tempUpdate", ({ temp }) => {
+      console.log("Received data:", temp);
+      setTemp(temp);
+      pushLog({
+        title: "Temperature",
+        time: new Date().toLocaleTimeString(),
+        value: `${temp}°C`,
+      });
+    });
+    socket.on("humidUpdate", ({ humid }) => {
+      console.log("Received data:", humid);
+      setHumid(humid);
+      pushLog({
+        title: "Humidity",
+        time: new Date().toLocaleTimeString(),
+        value: `${humid}%`,
+      });
+    });
+    socket.on("fanUpdate", ({ fan }) => {
+      console.log("Received data:", fan);
+      setFan(fan);
+      pushLog({
+        title: "Fan speed",
+        time: new Date().toLocaleTimeString(),
+        value: `${fan}%`,
+      });
+    });
+    socket.on("ledUpdate", ({ led }) => {
+      console.log("Received data:", led);
+      setLed(led);
+      pushLog({
+        title: "Led",
+        time: new Date().toLocaleTimeString(),
+        value: led ? "On" : "Off",
+      });
+    });
+    socket.on("aiUpdate", ({ ai }) => {
+      console.log("Received data:", ai);
+      setAi(ai);
+      pushLog({
+        title: "AI Result",
+        time: new Date().toLocaleTimeString(),
+        value: ai,
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   return (
     <Box m="20px">
-      {/* HEADER */}
-      <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Header title="DASHBOARD" subtitle="Welcome to your dashboard" />
-
-        <Box>
-          <Button
-            sx={{
-              backgroundColor: colors.blueAccent[700],
-              color: colors.grey[100],
-              fontSize: "14px",
-              fontWeight: "bold",
-              padding: "10px 20px",
-            }}
-          >
-            <DownloadOutlinedIcon sx={{ mr: "10px" }} />
-            Download Reports
-          </Button>
-        </Box>
-      </Box>
-
       {/* GRID & CHARTS */}
       <Box
         display="grid"
@@ -79,12 +146,38 @@ const Dashboard = () => {
           justifyContent="center"
           flexDirection="column"
         >
-          <h1>
-            <LightbulbIcon />
-            Light
+          <h1
+            style={{
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                // height: "1em",
+                marginRight: "0.5em",
+              }}
+            >
+              {led ? (
+                <FontAwesomeIcon icon={lightbulbOn} beat />
+              ) : (
+                <FontAwesomeIcon icon={lightbulbOff} />
+              )}
+            </span>
+            Led
           </h1>
-
-          <Switch defaultChecked color="secondary" />
+          <Switch
+            color="secondary"
+            checked={led}
+            onChange={async () => {
+              setLedLoading(true); // set loading state to true
+              const newLedState = led ? 0 : 1;
+              await updateLed(newLedState.toString());
+              setLed(!led);
+              setLedLoading(false); // set loading state to false
+            }}
+            value={led}
+          />
         </Box>
         <Box
           gridColumn="span 3"
@@ -94,8 +187,61 @@ const Dashboard = () => {
           justifyContent="center"
           flexDirection="column"
         >
-          <h1>Fan</h1>
-          <Switch defaultChecked color="secondary" />
+          <h1
+            style={{
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                marginRight: "0.5em",
+              }}
+            >
+              <FontAwesomeIcon icon={faFan} spin={fan != 0} />
+            </span>
+            Fan
+          </h1>
+          {fanLoading && (
+            <CircularProgress
+              sx={{
+                position: "absolute",
+              }}
+              size={24}
+            />
+          )}
+          <Slider
+            aria-label="Always visible"
+            value={parseInt(fan)}
+            step={1}
+            marks={[
+              {
+                value: 0,
+                label: "0",
+              },
+              {
+                value: 20,
+                label: "20",
+              },
+              {
+                value: 50,
+                label: "50",
+              },
+              {
+                value: 100,
+                label: "Max",
+              },
+            ]}
+            valueLabelDisplay="on"
+            sx={{ width: "80%", margin: "10px 0" }}
+            color="secondary"
+            onChange={async (event, newValue) => {
+              setFanLoading(true);
+              await updateFan(newValue.toString());
+              setFan(newValue);
+              setFanLoading(false);
+            }}
+          />
         </Box>
         <Box
           gridColumn="span 3"
@@ -105,10 +251,29 @@ const Dashboard = () => {
           justifyContent="center"
           flexDirection="column"
         >
-          <h1>
-            <DeviceThermostatIcon />
+          <h1
+            style={{
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                // height: "1em",
+                marginRight: "0.5em",
+              }}
+            >
+              <FontAwesomeIcon icon={faTemperatureThreeQuarters} />
+            </span>
             Temperature
           </h1>
+          <Typography
+            variant="h3"
+            fontWeight="bold"
+            color={colors.greenAccent[500]}
+          >
+            {temp} °C
+          </Typography>
         </Box>
         <Box
           gridColumn="span 3"
@@ -118,7 +283,28 @@ const Dashboard = () => {
           justifyContent="center"
           flexDirection="column"
         >
-          <h1>Humidity</h1>
+          <h1
+            style={{
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                marginRight: "0.5em",
+              }}
+            >
+              <FontAwesomeIcon icon={faDroplet} />
+            </span>
+            Humidity
+          </h1>
+          <Typography
+            variant="h3"
+            fontWeight="bold"
+            color={colors.greenAccent[500]}
+          >
+            {humid} %
+          </Typography>
         </Box>
 
         {/* ROW 2 */}
@@ -147,7 +333,7 @@ const Dashboard = () => {
                 fontWeight="bold"
                 color={colors.greenAccent[500]}
               >
-                $59,342.32
+                Last 12hrs
               </Typography>
             </Box>
             <Box>
@@ -165,6 +351,7 @@ const Dashboard = () => {
             <LineChart isDashboard={true} />
           </Box>
         </Box>
+
         <Box
           gridColumn="span 4"
           gridRow="span 2"
@@ -182,99 +369,65 @@ const Dashboard = () => {
             <Typography color={colors.grey[100]} variant="h5" fontWeight="600">
               Recent Logs
             </Typography>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => {
+                setLogs([]);
+              }}
+            >
+              Clear Logs
+            </Button>
           </Box>
-          {mockTransactions.map((transaction, i) => (
+          {logs.map((log, i) => (
             <Box
-              key={`${transaction.txId}-${i}`}
+              key={i}
               display="flex"
               justifyContent="space-between"
               alignItems="center"
               borderBottom={`4px solid ${colors.primary[500]}`}
               p="15px"
             >
-              <Box>
+              <Box
+                sx={{
+                  width: "30%",
+                }}
+              >
                 <Typography
                   color={colors.greenAccent[500]}
                   variant="h5"
                   fontWeight="600"
                 >
-                  {transaction.txId}
-                </Typography>
-                <Typography color={colors.grey[100]}>
-                  {transaction.user}
+                  {log.title}
                 </Typography>
               </Box>
-              <Box color={colors.grey[100]}>{transaction.date}</Box>
+              <div></div>
               <Box
-                backgroundColor={colors.greenAccent[500]}
-                p="5px 10px"
-                borderRadius="4px"
+                color={colors.grey[100]}
+                sx={{
+                  width: "30%",
+                }}
               >
-                ${transaction.cost}
+                {log.time}
+              </Box>
+              <Box
+                sx={{
+                  width: "40%",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <Box
+                  backgroundColor={colors.greenAccent[500]}
+                  p="5px 10px"
+                  borderRadius="4px"
+                  width="fit-content"
+                >
+                  {log.value}
+                </Box>
               </Box>
             </Box>
           ))}
-        </Box>
-
-        {/* ROW 3 */}
-        <Box
-          gridColumn="span 4"
-          gridRow="span 2"
-          backgroundColor={colors.primary[400]}
-          p="30px"
-        >
-          <Typography variant="h5" fontWeight="600">
-            Campaign
-          </Typography>
-          <Box
-            display="flex"
-            flexDirection="column"
-            alignItems="center"
-            mt="25px"
-          >
-            {/* <ProgressCircle size="125" /> */}
-            <Typography
-              variant="h5"
-              color={colors.greenAccent[500]}
-              sx={{ mt: "15px" }}
-            >
-              $48,352 revenue generated
-            </Typography>
-            <Typography>Includes extra misc expenditures and costs</Typography>
-          </Box>
-        </Box>
-        <Box
-          gridColumn="span 4"
-          gridRow="span 2"
-          backgroundColor={colors.primary[400]}
-        >
-          <Typography
-            variant="h5"
-            fontWeight="600"
-            sx={{ padding: "30px 30px 0 30px" }}
-          >
-            Sales Quantity
-          </Typography>
-          <Box height="250px" mt="-20px">
-            {/* <BarChart isDashboard={true} /> */}
-          </Box>
-        </Box>
-        <Box
-          gridColumn="span 4"
-          gridRow="span 2"
-          backgroundColor={colors.primary[400]}
-          padding="30px"
-        >
-          <Typography
-            variant="h5"
-            fontWeight="600"
-            sx={{ marginBottom: "15px" }}
-          >
-            Geography Based Traffic
-          </Typography>
-          <Box height="200px">
-            {/* <GeographyChart isDashboard={true} /> */}
-          </Box>
         </Box>
       </Box>
     </Box>

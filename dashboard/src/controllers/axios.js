@@ -1,24 +1,36 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_ADAFRUIT_API_URL
-
-const instance = axios.create({
-  baseURL: API_URL,
-  headers: {
-    "X-AIO-Key": `${process.env.REACT_APP_ADAFRUIT_KEY}`,
-    "Content-Type": "application/json",
-  },
+const backendInstance = axios.create({
+  baseURL: process.env.REACT_APP_SERVER_URL,
 });
 
-export const fetchLastData = async (feed_key) => {
-  const url = `/feeds/${feed_key}/data/last`;
+export const getCurrentData = async (feed) => {
+  const response = await backendInstance.get(`/api/data/current?feed=${feed}`)
+  return response.data.value
+};
 
+
+export const updateFan = async (value) => {
   try {
-    const response = await instance.get(url);
-
-    return response.data.value;
-  } catch (error) {
-    console.error(error);
-    return null;
+    const response = await backendInstance.post("/api/data/setfan", { value: value })
+    return response.data
+  }
+  catch (error) {
+    console.log(error)
   }
 };
+
+export const updateLed = async (value) => {
+  try {
+    const response = await backendInstance.post("/api/data/setled", { value: value })
+    return response.data
+  }
+  catch (error) {
+    console.log(error)
+  }
+};
+
+
+
+export const get24SolidTemperatures = () => backendInstance.get("api/data/daytemperatures");
+export const get24SolidHumidities = () => backendInstance.get("api/data/dayhumidities");
