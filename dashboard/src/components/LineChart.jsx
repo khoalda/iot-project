@@ -2,14 +2,51 @@ import { ResponsiveLine } from "@nivo/line";
 import { useTheme } from "@mui/material";
 import { tokens } from "../theme";
 import { mockLineData as data } from "../data/mockData";
+import { useEffect, useState } from "react";
+import { fetchHourlyAverage } from "../controllers/axios";
 
 const LineChart = ({ isCustomLineColors = false, isDashboard = false }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
 
+  const [lineData, setLineData] = useState([
+    {
+      id: "Temperature",
+      color: tokens("dark").greenAccent[500],
+      data: [],
+    },
+    {
+      id: "Humidity",
+      color: tokens("dark").blueAccent[300],
+      data: [],
+    },
+  ]);
+
+  useEffect(() => {
+    async function fetchData() {
+      const tempData = await fetchHourlyAverage("temp", 6);
+      const humidData = await fetchHourlyAverage("humid", 6);
+      setLineData([
+        {
+          id: "Temperature",
+          color: tokens("dark").greenAccent[500],
+          data: tempData,
+        },
+        {
+          id: "Humidity",
+          color: tokens("dark").blueAccent[300],
+          data: humidData,
+        },
+      ]);
+      console.log(tempData);
+      console.log(humidData);
+    }
+    fetchData();
+  }, []);
+
   return (
     <ResponsiveLine
-      data={data}
+      data={lineData}
       theme={{
         axis: {
           domain: {

@@ -12,16 +12,11 @@ import {
 import { tokens } from "../theme";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 
-import LightbulbIcon from "@mui/icons-material/Lightbulb";
-import DeviceThermostatIcon from "@mui/icons-material/DeviceThermostat";
 import LineChart from "../components/LineChart";
 import { useState, useEffect } from "react";
-import { getCurrentData, updateFan, updateLed } from "../controllers/axios";
-import Header from "../components/Header";
+import { fetchLastData, updateFan, updateLed } from "../controllers/axios";
 
 import io from "socket.io-client";
-// import css
-import "./Dashboard.css";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -43,11 +38,14 @@ const Dashboard = () => {
   const [led, setLed] = useState(0);
   const [ai, setAi] = useState("0");
 
-  const [ledLoading, setLedLoading] = useState(false);
-  const [fanLoading, setFanLoading] = useState(false);
-  const [tempLoading, setTempLoading] = useState(false);
-  const [humidLoading, setHumidLoading] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
+  const [ledLoading, setLedLoading] = useState(true);
+  const [fanLoading, setFanLoading] = useState(true);
+  const [tempLoading, setTempLoading] = useState(true);
+  const [humidLoading, setHumidLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(true);
+
+  const [savingLed, setSavingLed] = useState(false);
+  const [savingFan, setSavingFan] = useState(false);
 
   const [logs, setLogs] = useState([]);
 
@@ -57,16 +55,25 @@ const Dashboard = () => {
 
   useEffect(() => {
     (async () => {
-      const currentTemp = await getCurrentData("temp");
+      const currentTemp = await fetchLastData("temp");
       setTemp(currentTemp);
-      const currentHumid = await getCurrentData("humid");
+      setTempLoading(false);
+
+      const currentHumid = await fetchLastData("humid");
       setHumid(currentHumid);
-      const currentFan = await getCurrentData("fan");
+      setHumidLoading(false);
+
+      const currentFan = await fetchLastData("fan");
       setFan(currentFan);
-      const currentLed = await getCurrentData("led");
+      setFanLoading(false);
+
+      const currentLed = await fetchLastData("led");
       setLed(parseInt(currentLed));
-      const currentAi = await getCurrentData("ai");
+      setLedLoading(false);
+
+      const currentAi = await fetchLastData("ai");
       setAi(currentAi);
+      setAiLoading(false);
     })();
   }, []);
 
@@ -143,8 +150,9 @@ const Dashboard = () => {
           backgroundColor={colors.primary[400]}
           display="flex"
           alignItems="center"
-          justifyContent="center"
+          justifyContent="space-around"
           flexDirection="column"
+          position="relative"
         >
           <h1
             style={{
@@ -166,26 +174,51 @@ const Dashboard = () => {
             </span>
             Led
           </h1>
-          <Switch
-            color="secondary"
-            checked={led}
-            onChange={async () => {
-              setLedLoading(true); // set loading state to true
-              const newLedState = led ? 0 : 1;
-              await updateLed(newLedState.toString());
-              setLed(!led);
-              setLedLoading(false); // set loading state to false
-            }}
-            value={led}
-          />
+          {ledLoading ? (
+            <CircularProgress
+              sx={{
+                marginBottom: 2,
+              }}
+              size={24}
+              color="secondary"
+            />
+          ) : (
+            <Switch
+              color="secondary"
+              checked={led === 1}
+              onChange={async () => {
+                setSavingLed(true); // set loading state to true
+                const newLedState = led ? 0 : 1;
+                await updateLed(newLedState.toString());
+                setLed(!led);
+                setSavingLed(false); // set loading state to false
+              }}
+              value={led}
+            />
+          )}
+
+          {savingLed && (
+            <CircularProgress
+              sx={{
+                position: "absolute",
+                top: 0, // position spinner on top right corner
+                right: 0,
+                marginTop: 2, // add margin to adjust position
+                marginRight: 2,
+              }}
+              size={24}
+              color="secondary"
+            />
+          )}
         </Box>
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
           display="flex"
           alignItems="center"
-          justifyContent="center"
+          justifyContent="space-around"
           flexDirection="column"
+          position="relative"
         >
           <h1
             style={{
@@ -202,53 +235,69 @@ const Dashboard = () => {
             </span>
             Fan
           </h1>
-          {fanLoading && (
+          {fanLoading ? (
+            <CircularProgress
+              sx={{
+                marginBottom: 2,
+              }}
+              color="secondary"
+              size={24}
+            />
+          ) : (
+            <Slider
+              aria-label="Always visible"
+              value={parseInt(fan)}
+              step={1}
+              marks={[
+                {
+                  value: 0,
+                  label: "0",
+                },
+                {
+                  value: 20,
+                  label: "20",
+                },
+                {
+                  value: 50,
+                  label: "50",
+                },
+                {
+                  value: 100,
+                  label: "Max",
+                },
+              ]}
+              valueLabelDisplay="on"
+              sx={{ width: "80%" }}
+              color="secondary"
+              onChange={async (event, newValue) => {
+                setSavingFan(true);
+                await updateFan(newValue.toString());
+                setFan(newValue);
+                setSavingFan(false);
+              }}
+            />
+          )}
+
+          {savingFan && (
             <CircularProgress
               sx={{
                 position: "absolute",
+                top: 0, // position spinner on top right corner
+                right: 0,
+                marginTop: 2, // add margin to adjust position
+                marginRight: 2,
               }}
+              color="secondary"
               size={24}
             />
           )}
-          <Slider
-            aria-label="Always visible"
-            value={parseInt(fan)}
-            step={1}
-            marks={[
-              {
-                value: 0,
-                label: "0",
-              },
-              {
-                value: 20,
-                label: "20",
-              },
-              {
-                value: 50,
-                label: "50",
-              },
-              {
-                value: 100,
-                label: "Max",
-              },
-            ]}
-            valueLabelDisplay="on"
-            sx={{ width: "80%", margin: "10px 0" }}
-            color="secondary"
-            onChange={async (event, newValue) => {
-              setFanLoading(true);
-              await updateFan(newValue.toString());
-              setFan(newValue);
-              setFanLoading(false);
-            }}
-          />
         </Box>
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
           display="flex"
           alignItems="center"
-          justifyContent="center"
+          justifyContent="space-around"
           flexDirection="column"
         >
           <h1
@@ -267,20 +316,30 @@ const Dashboard = () => {
             </span>
             Temperature
           </h1>
-          <Typography
-            variant="h3"
-            fontWeight="bold"
-            color={colors.greenAccent[500]}
-          >
-            {temp} °C
-          </Typography>
+          {tempLoading ? (
+            <CircularProgress
+              sx={{
+                marginBottom: 2,
+              }}
+              color="secondary"
+              size={24}
+            />
+          ) : (
+            <Typography
+              variant="h3"
+              fontWeight="bold"
+              color={colors.greenAccent[500]}
+            >
+              {temp} °C
+            </Typography>
+          )}
         </Box>
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
           display="flex"
           alignItems="center"
-          justifyContent="center"
+          justifyContent="space-around"
           flexDirection="column"
         >
           <h1
@@ -298,13 +357,23 @@ const Dashboard = () => {
             </span>
             Humidity
           </h1>
-          <Typography
-            variant="h3"
-            fontWeight="bold"
-            color={colors.greenAccent[500]}
-          >
-            {humid} %
-          </Typography>
+          {humidLoading ? (
+            <CircularProgress
+              sx={{
+                marginBottom: 2,
+              }}
+              color="secondary"
+              size={24}
+            />
+          ) : (
+            <Typography
+              variant="h3"
+              fontWeight="bold"
+              color={colors.greenAccent[500]}
+            >
+              {humid} %
+            </Typography>
+          )}
         </Box>
 
         {/* ROW 2 */}
@@ -428,6 +497,50 @@ const Dashboard = () => {
               </Box>
             </Box>
           ))}
+        </Box>
+
+        {/* ROW 3 */}
+        <Box
+          gridColumn="span 8"
+          gridRow="span 2"
+          backgroundColor={colors.primary[400]}
+          flexGrow={1}
+        >
+          <Box
+            mt="25px"
+            p="0 30px"
+            display="flex "
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Box>
+              <Typography
+                variant="h5"
+                fontWeight="600"
+                color={colors.grey[100]}
+              >
+                AI Result
+              </Typography>
+              {aiLoading ? (
+                <CircularProgress
+                  sx={{
+                    marginBottom: 2,
+                  }}
+                  color="secondary"
+                  size={24}
+                />
+              ) : (
+                <Typography
+                  variant="h3"
+                  fontWeight="bold"
+                  color={colors.greenAccent[500]}
+                >
+                  {ai}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+          <Box height="250px" m="-20px 0 0 0"></Box>
         </Box>
       </Box>
     </Box>
