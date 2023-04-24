@@ -39,7 +39,7 @@ def imageDetector():
     # Print prediction and confidence score
     # print("Class:", class_name[2:], end="")
     # print("Confidence Score:", str(np.round(confidence_score * 100))[:-2], "%")
-    print(labels[np.argmax(prediction)])
+    #print(labels[np.argmax(prediction)])
     return labels[np.argmax(prediction)]
     # Listen to the keyboard for presses.
 

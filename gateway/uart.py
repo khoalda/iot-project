@@ -22,12 +22,9 @@ def processData(client, data):
     splitData = data.split(":")
     print(splitData)
     if splitData[1] == "T":
-        client.publish("cambien1", splitData[2])
+        client.publish("temp", splitData[2])
     if splitData[1] == "H":
-        client.publish("cambien2", splitData[2])
-    if splitData[1] == "L":
-        client.publish("cambien3", splitData[2])
-
+        client.publish("humid", splitData[2])
 
 mess = ""
 def readSerial(client):
